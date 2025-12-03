@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
@@ -6,6 +7,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/custom_button.dart';
+import 'forgot_password_page.dart';
 
 class AuthPage extends StatefulWidget {
   final Function(User) onLogin;
@@ -22,7 +24,8 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
   
   bool _isSignUp = false;
   bool _loading = false;
-  
+  bool _obscurePassword = true;
+
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -75,7 +78,24 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
     setState(() => _isSignUp = !_isSignUp);
     _rotationController.forward(from: 0);
   }
-  
+
+  void _showComingSoon(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(LucideIcons.clock, color: Colors.white, size: 18),
+            const SizedBox(width: 12),
+            Text('$feature coming soon!'),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.gray800,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -138,27 +158,24 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                     RotationTransition(
                       turns: Tween<double>(begin: 0, end: 0.05).animate(_rotationController),
                       child: Container(
-                        width: 80,
-                        height: 80,
+                        width: 100,
+                        height: 100,
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [AppColors.primary, AppColors.secondary, AppColors.accent],
-                          ),
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(32),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.secondary.withValues(alpha: 0.4),
-                              blurRadius: 20,
+                              color: AppColors.primary.withValues(alpha: 0.2),
+                              blurRadius: 30,
                               offset: const Offset(0, 10),
                             ),
                           ],
                         ),
-                        child: const Icon(
-                          LucideIcons.sparkles,
-                          color: Colors.white,
-                          size: 40,
+                        padding: const EdgeInsets.all(16),
+                        child: SvgPicture.asset(
+                          'assets/logo/corpfinity_logo.svg',
+                          width: 68,
+                          height: 68,
                         ),
                       ),
                     ),
@@ -254,6 +271,14 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                             decoration: InputDecoration(
                               labelText: 'Password',
                               prefixIcon: const Icon(LucideIcons.lock, color: AppColors.gray400),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword ? LucideIcons.eyeOff : LucideIcons.eye,
+                                  color: AppColors.gray400,
+                                  size: 20,
+                                ),
+                                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                              ),
                               filled: true,
                               fillColor: AppColors.gray50,
                               border: OutlineInputBorder(
@@ -261,7 +286,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                                 borderSide: const BorderSide(color: AppColors.gray200),
                               ),
                             ),
-                            obscureText: true,
+                            obscureText: _obscurePassword,
                             validator: (value) {
                               if (value == null || value.isEmpty) {
                                 return 'Please enter your password';
@@ -276,7 +301,14 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                             Align(
                               alignment: Alignment.centerRight,
                               child: TextButton(
-                                onPressed: () {},
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const ForgotPasswordPage(),
+                                    ),
+                                  );
+                                },
                                 child: Text(
                                   'Forgot Password?',
                                   style: AppTextStyles.caption.copyWith(
@@ -327,7 +359,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () {},
+                            onPressed: () => _showComingSoon('Google Sign-In'),
                             icon: const _GoogleIcon(),
                             label: Text('Google', style: AppTextStyles.bodySmall.copyWith(color: AppColors.gray700)),
                             style: OutlinedButton.styleFrom(
@@ -342,7 +374,7 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                         const SizedBox(width: 12),
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () {},
+                            onPressed: () => _showComingSoon('Facebook Sign-In'),
                             icon: const _FacebookIcon(),
                             label: Text('Facebook', style: AppTextStyles.bodySmall.copyWith(color: AppColors.gray700)),
                             style: OutlinedButton.styleFrom(

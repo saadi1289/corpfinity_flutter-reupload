@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../models/challenge.dart';
+import '../models/reminder.dart';
 
 class StorageService {
   static const String _userKey = 'zenflow_user';
@@ -9,6 +10,7 @@ class StorageService {
   static const String _historyKey = 'zenflow_history';
   static const String _waterKey = 'zenflow_water';
   static const String _waterDateKey = 'zenflow_water_date';
+  static const String _remindersKey = 'zenflow_reminders';
   
   // User operations
   Future<void> saveUser(User user) async {
@@ -71,5 +73,55 @@ class StorageService {
     final count = prefs.getInt(_waterKey) ?? 0;
     final date = prefs.getString(_waterDateKey) ?? '';
     return (count: count, date: date);
+  }
+  
+  // Reminder operations
+  Future<void> saveReminders(List<Reminder> reminders) async {
+    final prefs = await SharedPreferences.getInstance();
+    final remindersJson = reminders.map((r) => r.toJson()).toList();
+    await prefs.setString(_remindersKey, jsonEncode(remindersJson));
+  }
+  
+  Future<List<Reminder>> getReminders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final remindersString = prefs.getString(_remindersKey);
+    if (remindersString == null) return [];
+    
+    final List<dynamic> remindersJson = jsonDecode(remindersString) as List;
+    return remindersJson
+        .map((json) => Reminder.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+  
+  Future<void> addReminder(Reminder reminder) async {
+    final reminders = await getReminders();
+    reminders.add(reminder);
+    await saveReminders(reminders);
+  }
+  
+  Future<void> updateReminder(Reminder reminder) async {
+    final reminders = await getReminders();
+    final index = reminders.indexWhere((r) => r.id == reminder.id);
+    if (index != -1) {
+      reminders[index] = reminder;
+      await saveReminders(reminders);
+    }
+  }
+  
+  Future<void> deleteReminder(String reminderId) async {
+    final reminders = await getReminders();
+    reminders.removeWhere((r) => r.id == reminderId);
+    await saveReminders(reminders);
+  }
+
+  // Clear all data (for account deletion)
+  Future<void> clearAllData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_userKey);
+    await prefs.remove(_stateKey);
+    await prefs.remove(_historyKey);
+    await prefs.remove(_waterKey);
+    await prefs.remove(_waterDateKey);
+    await prefs.remove(_remindersKey);
   }
 }

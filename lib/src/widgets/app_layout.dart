@@ -88,18 +88,21 @@ class AppLayout extends StatelessWidget {
               ),
               
               // Main content
-              Column(
-                children: [
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: isLargeScreen
-                          ? const BorderRadius.vertical(top: Radius.circular(AppTheme.radius3Xl))
-                          : BorderRadius.zero,
-                      child: child,
+              SafeArea(
+                bottom: false,
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: isLargeScreen
+                            ? const BorderRadius.vertical(top: Radius.circular(AppTheme.radius3Xl))
+                            : BorderRadius.zero,
+                        child: child,
+                      ),
                     ),
-                  ),
-                  if (bottomBar != null) bottomBar!,
-                ],
+                    if (bottomBar != null) bottomBar!,
+                  ],
+                ),
               ),
             ],
           ),

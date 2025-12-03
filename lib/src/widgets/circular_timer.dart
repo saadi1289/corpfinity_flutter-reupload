@@ -7,12 +7,14 @@ class CircularTimer extends StatefulWidget {
   final int timeLeft;
   final int totalTime;
   final bool isActive;
+  final double size;
   
   const CircularTimer({
     super.key,
     required this.timeLeft,
     required this.totalTime,
     required this.isActive,
+    this.size = 280,
   });
   
   @override
@@ -74,8 +76,8 @@ class _CircularTimerState extends State<CircularTimer>
           );
         },
         child: SizedBox(
-          width: 280,
-          height: 280,
+          width: widget.size,
+          height: widget.size,
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -85,8 +87,8 @@ class _CircularTimerState extends State<CircularTimer>
                   duration: const Duration(milliseconds: 600),
                   builder: (context, value, child) {
                     return Container(
-                      width: 280,
-                      height: 280,
+                      width: widget.size,
+                      height: widget.size,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         boxShadow: [
@@ -101,7 +103,7 @@ class _CircularTimerState extends State<CircularTimer>
                   },
                 ),
               CustomPaint(
-                size: const Size(260, 260),
+                size: Size(widget.size - 20, widget.size - 20),
                 painter: _CircularTimerPainter(
                   progress: progress,
                   isActive: widget.isActive,
@@ -119,6 +121,9 @@ class _CircularTimerState extends State<CircularTimer>
     final mins = widget.timeLeft ~/ 60;
     final secs = widget.timeLeft % 60;
     final isReady = widget.timeLeft == widget.totalTime;
+    final scaleFactor = widget.size / 280;
+    final fontSize = 56 * scaleFactor;
+    final statusFontSize = 13 * scaleFactor;
     
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -128,27 +133,27 @@ class _CircularTimerState extends State<CircularTimer>
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
-            _AnimatedDigit(value: mins ~/ 10),
-            _AnimatedDigit(value: mins % 10),
+            _AnimatedDigit(value: mins ~/ 10, fontSize: fontSize),
+            _AnimatedDigit(value: mins % 10, fontSize: fontSize),
             Text(
               ':',
               style: GoogleFonts.spaceGrotesk(
-                fontSize: 56,
+                fontSize: fontSize,
                 fontWeight: FontWeight.w300,
                 color: AppColors.gray800,
                 height: 1,
               ),
             ),
-            _AnimatedDigit(value: secs ~/ 10),
-            _AnimatedDigit(value: secs % 10),
+            _AnimatedDigit(value: secs ~/ 10, fontSize: fontSize),
+            _AnimatedDigit(value: secs % 10, fontSize: fontSize),
           ],
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 12 * scaleFactor),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 250),
           child: Container(
             key: ValueKey(isReady ? 'ready' : (widget.isActive ? 'active' : 'paused')),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+            padding: EdgeInsets.symmetric(horizontal: 14 * scaleFactor, vertical: 6 * scaleFactor),
             decoration: BoxDecoration(
               color: widget.isActive 
                   ? AppColors.secondary.withValues(alpha: 0.12)
@@ -160,12 +165,12 @@ class _CircularTimerState extends State<CircularTimer>
               children: [
                 if (widget.isActive) ...[
                   const _PulsingDot(),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 6 * scaleFactor),
                 ],
                 Text(
                   isReady ? 'Ready' : (widget.isActive ? 'In progress' : 'Paused'),
                   style: GoogleFonts.dmSans(
-                    fontSize: 13,
+                    fontSize: statusFontSize.clamp(11.0, 14.0),
                     fontWeight: FontWeight.w500,
                     color: widget.isActive ? AppColors.secondary : AppColors.gray500,
                   ),
@@ -181,7 +186,8 @@ class _CircularTimerState extends State<CircularTimer>
 
 class _AnimatedDigit extends StatelessWidget {
   final int value;
-  const _AnimatedDigit({required this.value});
+  final double fontSize;
+  const _AnimatedDigit({required this.value, this.fontSize = 56});
   
   @override
   Widget build(BuildContext context) {
@@ -203,7 +209,7 @@ class _AnimatedDigit extends StatelessWidget {
         '$value',
         key: ValueKey(value),
         style: GoogleFonts.spaceGrotesk(
-          fontSize: 56,
+          fontSize: fontSize,
           fontWeight: FontWeight.w300,
           color: AppColors.gray800,
           height: 1,
@@ -276,12 +282,12 @@ class _CircularTimerPainter extends CustomPainter {
     
     if (progress > 0) {
       final progressPaint = Paint()
-        ..shader = SweepGradient(
+        ..shader = const SweepGradient(
           startAngle: -pi / 2,
           endAngle: 3 * pi / 2,
-          colors: const [AppColors.primary, AppColors.accent, AppColors.secondary, AppColors.primary],
-          stops: const [0.0, 0.33, 0.66, 1.0],
-          transform: const GradientRotation(-pi / 2),
+          colors: [AppColors.primary, AppColors.accent, AppColors.secondary, AppColors.primary],
+          stops: [0.0, 0.33, 0.66, 1.0],
+          transform: GradientRotation(-pi / 2),
         ).createShader(Rect.fromCircle(center: center, radius: radius))
         ..style = PaintingStyle.stroke
         ..strokeWidth = 8

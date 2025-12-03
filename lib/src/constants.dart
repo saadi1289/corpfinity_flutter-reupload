@@ -58,19 +58,19 @@ class AppConstants {
   })> energyOptions = [
     (
       value: EnergyLevel.low,
-      icon: 'Battery',
+      icon: 'Leaf',
       color: Color(0xFFCB6B5E), // Dusty coral
       bg: Color(0xFFFDF6F5), // Soft coral bg
     ),
     (
       value: EnergyLevel.medium,
-      icon: 'BatteryMedium',
+      icon: 'Flame',
       color: Color(0xFFD4A84B), // Amber gold
       bg: Color(0xFFFDF9F0), // Warm cream
     ),
     (
       value: EnergyLevel.high,
-      icon: 'BatteryCharging',
+      icon: 'Zap',
       color: AppColors.secondary, // Sage green
       bg: Color(0xFFF4F8F3), // Soft sage bg
     ),
@@ -149,27 +149,32 @@ class AppConstants {
     ),
   ];
   
-  // Mood tips
-  static const Map<String, ({String title, String desc})> moodTips = {
+  // Mood tips (emojis removed - icons handled by UI)
+  static const Map<String, ({String title, String desc, String iconKey})> moodTips = {
     'Great': (
-      title: 'Radiate Joy ✨',
+      title: 'Radiate Joy',
       desc: 'Your energy is magnetic today. Share a kind word with someone.',
+      iconKey: 'sparkles',
     ),
     'Good': (
-      title: 'Ride the Wave 🌊',
+      title: 'Ride the Wave',
       desc: 'You\'re in a great flow. Perfect time to tackle something meaningful.',
+      iconKey: 'wave',
     ),
     'Okay': (
-      title: 'Small Steps 🌱',
+      title: 'Small Steps',
       desc: 'One small win can shift everything. What\'s one thing you can complete?',
+      iconKey: 'seedling',
     ),
     'Tired': (
-      title: 'Gentle Recharge 🍃',
+      title: 'Gentle Recharge',
       desc: 'Step outside for fresh air. A glass of water and deep breaths help.',
+      iconKey: 'leaf',
     ),
     'Stressed': (
-      title: 'Ground Yourself 🧘',
+      title: 'Ground Yourself',
       desc: 'Notice 5 things you see, 4 you feel, 3 you hear. Breathe slowly.',
+      iconKey: 'heart',
     ),
   };
 }

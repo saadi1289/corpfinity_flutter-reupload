@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:heroicons_flutter/heroicons_flutter.dart';
 import 'dart:async';
 import 'dart:math';
 import '../models/user.dart';
@@ -7,14 +8,19 @@ import '../models/app_step.dart';
 import '../models/energy_level.dart';
 import '../models/goal_option.dart';
 import '../models/challenge.dart';
+import '../models/reminder.dart';
 import '../services/challenge_service.dart';
 import '../services/storage_service.dart';
+
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_text_styles.dart';
 import '../constants.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/circular_timer.dart';
+import '../widgets/challenge_icon.dart';
+import '../services/share_service.dart';
+import 'reminders_page.dart';
 
 class HomePage extends StatefulWidget {
   final User user;
@@ -25,7 +31,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
+class _HomePageState extends State<HomePage> {
   final _storage = StorageService();
   final _challengeService = ChallengeService();
   
@@ -45,17 +51,21 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   // Challenge
   GeneratedChallenge? _currentChallenge;
 
+  // Reminders
+  List<Reminder> _reminders = [];
   
+
   // Timer
   int _timeLeft = 0;
   int _totalTime = 0;
   bool _isTimerActive = false;
   bool _timerFinished = false;
   Timer? _timer;
+
+  // Scroll controller for challenge view
+  final _challengeScrollController = ScrollController();
   
-  // Animations
-  late AnimationController _floatController;
-  late Animation<double> _floatAnimation;
+
   
   // Daily quote
   late ({String text, String author}) _dailyQuote;
@@ -65,25 +75,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _initializeData();
-    _setupAnimations();
   }
   
   @override
   void dispose() {
     _timer?.cancel();
-    _floatController.dispose();
+    _challengeScrollController.dispose();
     super.dispose();
-  }
-  
-  void _setupAnimations() {
-    _floatController = AnimationController(
-      duration: const Duration(seconds: 6),
-      vsync: this,
-    )..repeat(reverse: true);
-    
-    _floatAnimation = Tween<double>(begin: 0, end: -10).animate(
-      CurvedAnimation(parent: _floatController, curve: Curves.easeInOut),
-    );
   }
   
   Future<void> _initializeData() async {
@@ -112,6 +110,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         _lastCompletedDate = state['lastCompletedDate'];
       });
     }
+    
+    // Load reminders
+    final reminders = await _storage.getReminders();
+    setState(() => _reminders = reminders);
   }
   
   int _parseDuration(String duration) {
@@ -131,9 +133,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   
   Future<void> _selectEnergy(EnergyLevel energy) async {
     setState(() {
-
       _currentStep = AppStep.generating;
-
     });
     
     await Future.delayed(const Duration(milliseconds: 1500));
@@ -144,6 +144,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   
   void _initializeChallenge(GeneratedChallenge challenge) {
     final seconds = _parseDuration(challenge.duration);
+    // Reset scroll position to top
+    if (_challengeScrollController.hasClients) {
+      _challengeScrollController.jumpTo(0);
+    }
     setState(() {
       _currentChallenge = challenge;
       _totalTime = seconds;
@@ -151,7 +155,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       _isTimerActive = false;
       _timerFinished = false;
       _currentStep = AppStep.challengeView;
-
     });
   }
   
@@ -191,6 +194,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       await _storage.saveWaterIntake(newCount, today);
       setState(() => _waterIntake = newCount);
     }
+  }
+  
+  Future<void> _openRemindersPage() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const RemindersPage()),
+    );
+    // Reload reminders when returning
+    final reminders = await _storage.getReminders();
+    setState(() => _reminders = reminders);
   }
   
   Future<void> _completeChallenge() async {
@@ -290,10 +303,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   // The following methods will build each screen
   
   Widget _buildDashboard() {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-      padding: const EdgeInsets.all(AppTheme.spacing6).copyWith(bottom: 96),
-      child: Column(
+    return RefreshIndicator(
+      onRefresh: _initializeData,
+      color: AppColors.primary,
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        padding: const EdgeInsets.all(AppTheme.spacing6).copyWith(bottom: 96),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
@@ -314,22 +330,45 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.warning.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(LucideIcons.trophy, size: 14, color: AppColors.warning),
-                    const SizedBox(width: 4),
-                    Text(
-                      '$_streak Day Streak',
-                      style: AppTextStyles.captionBold.copyWith(color: AppColors.warning),
-                    ),
-                  ],
+              // Bell icon for reminders
+              GestureDetector(
+                onTap: _openRemindersPage,
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                      ),
+                    ],
+                  ),
+                  child: Stack(
+                    children: [
+                      Icon(
+                        _reminders.where((r) => r.isEnabled).isNotEmpty
+                            ? LucideIcons.bellRing
+                            : LucideIcons.bell,
+                        size: 20,
+                        color: AppColors.gray700,
+                      ),
+                      if (_reminders.where((r) => r.isEnabled).isNotEmpty)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -338,7 +377,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           
           // Hero Card - Start Flow
           _HeroCard(
-            floatAnimation: _floatAnimation,
             onTap: () => setState(() => _currentStep = AppStep.goalSelection),
             child: Container(
                 height: 192,
@@ -347,7 +385,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [AppColors.primary, Color(0xFF7E7BF7), AppColors.secondary],
+                    colors: [AppColors.primary, AppColors.primaryLight, AppColors.secondary],
                   ),
                   borderRadius: BorderRadius.circular(AppTheme.radius2Xl),
                   boxShadow: [
@@ -393,17 +431,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Row(
-                          children: ['⚡', '🧠', '🧘'].map((emoji) {
-                            return Container(
-                              width: 32,
-                              height: 32,
-                              margin: const EdgeInsets.only(right: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.3),
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.transparent, width: 2),
-                              ),
-                              child: Center(child: Text(emoji)),
+                          children: [
+                            (icon: HeroiconsOutline.bolt, solid: HeroiconsSolid.bolt),
+                            (icon: HeroiconsOutline.lightBulb, solid: HeroiconsSolid.lightBulb),
+                            (icon: HeroiconsOutline.heart, solid: HeroiconsSolid.heart),
+                          ].map((iconData) {
+                            return _HeroCardIcon(
+                              outlineIcon: iconData.icon,
+                              solidIcon: iconData.solid,
                             );
                           }).toList(),
                         ),
@@ -444,15 +479,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           _buildHydrationTracker(),
           const SizedBox(height: AppTheme.spacing6),
           
-          _buildQuickChallenges(),
+          _buildRemindersCard(),
           const SizedBox(height: AppTheme.spacing6),
           
+          _buildQuickChallenges(),
+          const SizedBox(height: AppTheme.spacing6),
+
           _buildDailyWisdom(),
         ],
       ),
+    ),
     );
   }
-  
+
   Widget _buildMoodTracker() {
     final activeMood = AppConstants.moods.firstWhere(
       (m) => m.label == _selectedMood,
@@ -495,16 +534,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: isSelected ? mood.bg : AppColors.gray50,
+                        color: isSelected ? mood.color : mood.bg,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isSelected ? mood.color : Colors.transparent,
+                          color: mood.color.withValues(alpha: isSelected ? 1.0 : 0.5),
                           width: 2,
                         ),
                       ),
                       child: Icon(
-                        _getMoodIcon(mood.icon), 
-                        color: isSelected ? mood.color : AppColors.gray400, 
+                        _getMoodIcon(mood.icon),
+                        color: isSelected ? Colors.white : mood.color,
                         size: 20,
                       ),
                     ),
@@ -512,7 +551,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     AnimatedDefaultTextStyle(
                       duration: const Duration(milliseconds: 200),
                       style: AppTextStyles.tiny.copyWith(
-                        color: isSelected ? mood.color : AppColors.gray400,
+                        color: mood.color,
                         fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                       ),
                       child: Text(mood.label),
@@ -541,7 +580,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         color: Colors.white,
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(LucideIcons.lightbulb, size: 16, color: activeMood.color),
+                      child: _MoodTipIcon(color: activeMood.color),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -655,6 +694,109 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
   
+  Widget _buildRemindersCard() {
+    final activeReminders = _reminders.where((r) => r.isEnabled).toList();
+    
+    return GestureDetector(
+      onTap: _openRemindersPage,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+          border: Border.all(color: AppColors.gray100),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 10,
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(LucideIcons.bellRing, size: 18, color: AppColors.accent),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Reminders',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.gray800,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    if (activeReminders.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${activeReminders.length} active',
+                          style: AppTextStyles.tiny.copyWith(color: AppColors.primary),
+                        ),
+                      ),
+                    const SizedBox(width: 8),
+                    const Icon(LucideIcons.chevronRight, size: 18, color: AppColors.gray400),
+                  ],
+                ),
+              ],
+            ),
+            if (activeReminders.isEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Set up reminders to stay on track',
+                style: AppTextStyles.caption.copyWith(color: AppColors.gray400),
+              ),
+            ] else ...[
+              const SizedBox(height: 16),
+              ...activeReminders.take(2).map((reminder) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Text(reminder.type.emoji, style: const TextStyle(fontSize: 16)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        reminder.title,
+                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.gray700),
+                      ),
+                    ),
+                    Text(
+                      reminder.formattedTime,
+                      style: AppTextStyles.caption.copyWith(color: AppColors.gray400),
+                    ),
+                  ],
+                ),
+              )),
+              if (activeReminders.length > 2)
+                Text(
+                  '+${activeReminders.length - 2} more',
+                  style: AppTextStyles.caption.copyWith(color: AppColors.primary),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+  
   Widget _buildQuickChallenges() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -699,7 +841,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(challenge.emoji, style: const TextStyle(fontSize: 24)),
+                          ChallengeIcon(emoji: challenge.emoji, size: 28),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
@@ -753,7 +895,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.all(AppTheme.spacing6),
       decoration: BoxDecoration(
-        color: AppColors.gray900,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.dark, AppColors.darkMuted],
+        ),
         borderRadius: BorderRadius.circular(AppTheme.radiusXl),
       ),
       child: Column(
@@ -761,7 +907,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           Text(
             'DAILY WISDOM',
             style: AppTextStyles.tiny.copyWith(
-              color: AppColors.gray400,
+              color: AppColors.accent,
               letterSpacing: 1.5,
             ),
           ),
@@ -779,7 +925,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           const SizedBox(height: 12),
           Text(
             '— ${_dailyQuote.author}',
-            style: AppTextStyles.caption.copyWith(color: AppColors.gray500),
+            style: AppTextStyles.caption.copyWith(color: AppColors.gray400),
           ),
         ],
       ),
@@ -797,14 +943,42 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           TextButton.icon(
             onPressed: () => setState(() => _currentStep = AppStep.welcome),
             icon: const Icon(LucideIcons.arrowLeft, size: 18),
-            label: const Text('Back to Dashboard'),
+            label: const Text('Back'),
             style: TextButton.styleFrom(foregroundColor: AppColors.gray500),
           ),
-          const SizedBox(height: 8),
-          Text('Wellness Goal?', style: AppTextStyles.display.copyWith(color: AppColors.gray900)),
-          const SizedBox(height: 8),
-          Text('Select a category to improve.', style: AppTextStyles.body.copyWith(color: AppColors.gray500)),
-          const SizedBox(height: AppTheme.spacing6),
+          const SizedBox(height: 24),
+          // Header with icon
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: AppColors.secondaryGradient,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(LucideIcons.target, size: 24, color: Colors.white),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Choose Your Focus',
+                      style: AppTextStyles.h2.copyWith(color: AppColors.gray900),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'What would you like to improve today?',
+                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.gray500),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          // Goal cards
           Expanded(
             child: ListView.builder(
               physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
@@ -813,11 +987,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 final goal = AppConstants.goalOptions[index];
                 return TweenAnimationBuilder<double>(
                   tween: Tween(begin: 0.0, end: 1.0),
-                  duration: Duration(milliseconds: 300 + (index * 80)),
+                  duration: Duration(milliseconds: 350 + (index * 80)),
                   curve: Curves.easeOutCubic,
                   builder: (context, value, child) {
                     return Transform.translate(
-                      offset: Offset(30 * (1 - value), 0),
+                      offset: Offset(0, 25 * (1 - value)),
                       child: Opacity(
                         opacity: value,
                         child: child,
@@ -840,7 +1014,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       ),
     );
   }
-  
+
   IconData _getGoalIcon(String iconName) {
     final iconMap = {
       'Brain': LucideIcons.brain,
@@ -866,50 +1040,82 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             label: const Text('Back'),
             style: TextButton.styleFrom(foregroundColor: AppColors.gray500),
           ),
-          const SizedBox(height: 8),
-          Text('Energy Level?', style: AppTextStyles.display.copyWith(color: AppColors.gray900)),
-          const SizedBox(height: 8),
-          Text('We\'ll adjust intensity accordingly.', style: AppTextStyles.body.copyWith(color: AppColors.gray500)),
-          const Spacer(),
-          ...AppConstants.energyOptions.asMap().entries.map((entry) {
-            final index = entry.key;
-            final option = entry.value;
-            return TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.0, end: 1.0),
-              duration: Duration(milliseconds: 350 + (index * 100)),
-              curve: Curves.easeOutBack,
-              builder: (context, value, child) {
-                return Transform.scale(
-                  scale: 0.8 + (0.2 * value),
-                  child: Opacity(
-                    opacity: value.clamp(0.0, 1.0),
-                    child: child,
+          const SizedBox(height: 24),
+          // Header with icon
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: AppColors.warmGradient,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(LucideIcons.gauge, size: 24, color: Colors.white),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'How\'s Your Energy?',
+                      style: AppTextStyles.h2.copyWith(color: AppColors.gray900),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'We\'ll match the intensity to how you feel',
+                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.gray500),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          // Energy cards
+          Expanded(
+            child: ListView.builder(
+              physics: const BouncingScrollPhysics(),
+              itemCount: AppConstants.energyOptions.length,
+              itemBuilder: (context, index) {
+                final option = AppConstants.energyOptions[index];
+                return TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: Duration(milliseconds: 400 + (index * 120)),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, child) {
+                    return Transform.translate(
+                      offset: Offset(0, 30 * (1 - value)),
+                      child: Opacity(
+                        opacity: value.clamp(0.0, 1.0),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _AnimatedEnergyCard(
+                      option: option,
+                      icon: _getEnergyIcon(option.icon),
+                      onTap: () => _selectEnergy(option.value),
+                    ),
                   ),
                 );
               },
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: _AnimatedEnergyCard(
-                  option: option,
-                  icon: _getEnergyIcon(option.icon),
-                  onTap: () => _selectEnergy(option.value),
-                ),
-              ),
-            );
-          }),
-          const Spacer(),
+            ),
+          ),
         ],
       ),
     );
   }
-  
+
   IconData _getEnergyIcon(String iconName) {
     final iconMap = {
-      'Battery': LucideIcons.battery,
-      'BatteryMedium': LucideIcons.batteryMedium,
-      'BatteryCharging': LucideIcons.batteryCharging,
+      'Leaf': LucideIcons.leaf,
+      'Flame': LucideIcons.flame,
+      'Zap': LucideIcons.zap,
     };
-    return iconMap[iconName] ?? LucideIcons.battery;
+    return iconMap[iconName] ?? LucideIcons.sparkles;
   }
   
   Widget _buildGenerating() {
@@ -951,12 +1157,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
     
     return SingleChildScrollView(
+      controller: _challengeScrollController,
       physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-      padding: const EdgeInsets.all(AppTheme.spacing6),
+      padding: const EdgeInsets.all(AppTheme.spacing6).copyWith(bottom: 96),
       child: Column(
         children: [
-          const SizedBox(height: 16),
-          
           // Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -971,111 +1176,132 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 label: const Text('Back'),
                 style: TextButton.styleFrom(foregroundColor: AppColors.gray500),
               ),
-              Text(
-                _currentChallenge!.duration,
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.gray400,
-                  fontWeight: FontWeight.w600,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(LucideIcons.clock, size: 14, color: AppColors.primary),
+                    const SizedBox(width: 6),
+                    Text(
+                      _currentChallenge!.duration,
+                      style: AppTextStyles.captionBold.copyWith(color: AppColors.primary),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 32),
-          
-          // Challenge emoji with scale animation
-          TweenAnimationBuilder(
-            duration: const Duration(milliseconds: 600),
-            tween: Tween<double>(begin: 0.0, end: 1.0),
-            curve: Curves.elasticOut,
-            builder: (context, double value, child) {
-              return Transform.scale(
-                scale: value,
-                child: child,
-              );
-            },
-            child: Text(
-              _currentChallenge!.emoji,
-              style: const TextStyle(fontSize: 80),
-            ),
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           
           // Challenge title
           Text(
             _currentChallenge!.title,
-            style: AppTextStyles.display.copyWith(color: AppColors.gray900),
+            style: AppTextStyles.h2.copyWith(color: AppColors.gray900),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 48),
+          const SizedBox(height: 24),
           
-          // Circular timer
+          // Timer
           CircularTimer(
             timeLeft: _timeLeft,
             totalTime: _totalTime,
             isActive: _isTimerActive,
+            size: 220,
           ),
-          const SizedBox(height: 48),
+          const SizedBox(height: 24),
           
-          // Timer controls
+          // Timer controls - always visible
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Reset button - always visible
+              GestureDetector(
+                onTap: _resetTimer,
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.gray200),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    LucideIcons.rotateCcw,
+                    size: 22,
+                    color: _timeLeft != _totalTime ? AppColors.gray700 : AppColors.gray300,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 20),
               // Play/Pause button
               GestureDetector(
                 onTap: _toggleTimer,
                 child: Container(
-                  width: 72,
-                  height: 72,
+                  width: 64,
+                  height: 64,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [AppColors.primary, AppColors.secondary],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [AppColors.primary, AppColors.primaryLight],
                     ),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.4),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
+                        color: AppColors.primary.withValues(alpha: 0.35),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
                       ),
                     ],
                   ),
                   child: Icon(
                     _isTimerActive ? LucideIcons.pause : LucideIcons.play,
-                    size: 32,
+                    size: 28,
                     color: Colors.white,
                   ),
                 ),
               ),
-              if (!_isTimerActive && _timeLeft != _totalTime) ...[
-                const SizedBox(width: 24),
-                // Reset button
-                GestureDetector(
-                  onTap: _resetTimer,
-                  child: Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.gray200, width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      LucideIcons.rotateCcw,
-                      size: 24,
-                      color: AppColors.gray600,
-                    ),
+              const SizedBox(width: 20),
+              // Skip/Complete button
+              GestureDetector(
+                onTap: _completeChallenge,
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.gray200),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    LucideIcons.circleCheck,
+                    size: 22,
+                    color: AppColors.success,
                   ),
                 ),
-              ],
+              ),
             ],
           ),
-          const SizedBox(height: 48),
+          const SizedBox(height: 24),
           
           // Instructions card
           Container(
@@ -1137,7 +1363,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('💡', style: TextStyle(fontSize: 20)),
+                        const ChallengeIcon(emoji: '💡', size: 24, color: AppColors.warning),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
@@ -1246,13 +1472,31 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ],
               ),
             ),
-            const SizedBox(height: 32),
-            CustomButton(
-              text: 'Back to Dashboard',
-              onPressed: _resetFlow,
-              variant: ButtonVariant.secondary,
-              fullWidth: true,
-              icon: const Icon(LucideIcons.refreshCcw, size: 18),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: CustomButton(
+                    text: 'Share',
+                    onPressed: () => ShareService.shareChallenge(
+                      context: context,
+                      title: _currentChallenge?.title ?? 'Wellness Challenge',
+                      duration: _currentChallenge?.duration ?? '',
+                      streak: _streak,
+                    ),
+                    variant: ButtonVariant.secondary,
+                    icon: const Icon(LucideIcons.share2, size: 18),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: CustomButton(
+                    text: 'Done',
+                    onPressed: _resetFlow,
+                    icon: const Icon(LucideIcons.check, size: 18, color: Colors.white),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -1264,12 +1508,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
 // Smooth touch feedback hero card
 class _HeroCard extends StatefulWidget {
-  final Animation<double> floatAnimation;
   final VoidCallback onTap;
   final Widget child;
   
   const _HeroCard({
-    required this.floatAnimation,
     required this.onTap,
     required this.child,
   });
@@ -1279,43 +1521,47 @@ class _HeroCard extends StatefulWidget {
 }
 
 class _HeroCardState extends State<_HeroCard> with SingleTickerProviderStateMixin {
-  late AnimationController _pressController;
-  late Animation<double> _pressAnimation;
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _elevationAnimation;
   
   @override
   void initState() {
     super.initState();
-    _pressController = AnimationController(
-      duration: const Duration(milliseconds: 150),
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 120),
       vsync: this,
     );
-    _pressAnimation = Tween<double>(begin: 1.0, end: 0.97).animate(
-      CurvedAnimation(parent: _pressController, curve: Curves.easeInOut),
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.98).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+    );
+    _elevationAnimation = Tween<double>(begin: 0.0, end: 4.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
     );
   }
   
   @override
   void dispose() {
-    _pressController.dispose();
+    _controller.dispose();
     super.dispose();
   }
   
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: (_) => _pressController.forward(),
+      onTapDown: (_) => _controller.forward(),
       onTapUp: (_) {
-        _pressController.reverse();
+        _controller.reverse();
         widget.onTap();
       },
-      onTapCancel: () => _pressController.reverse(),
+      onTapCancel: () => _controller.reverse(),
       child: AnimatedBuilder(
-        animation: Listenable.merge([widget.floatAnimation, _pressAnimation]),
+        animation: _controller,
         builder: (context, child) {
-          return Transform.translate(
-            offset: Offset(0, widget.floatAnimation.value),
-            child: Transform.scale(
-              scale: _pressAnimation.value,
+          return Transform.scale(
+            scale: _scaleAnimation.value,
+            child: Transform.translate(
+              offset: Offset(0, _elevationAnimation.value),
               child: child,
             ),
           );
@@ -1403,12 +1649,12 @@ class _AnimatedGoalCard extends StatefulWidget {
   State<_AnimatedGoalCard> createState() => _AnimatedGoalCardState();
 }
 
-class _AnimatedGoalCardState extends State<_AnimatedGoalCard> 
+class _AnimatedGoalCardState extends State<_AnimatedGoalCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   bool _isPressed = false;
-  
+
   @override
   void initState() {
     super.initState();
@@ -1420,13 +1666,13 @@ class _AnimatedGoalCardState extends State<_AnimatedGoalCard>
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
   }
-  
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -1449,17 +1695,17 @@ class _AnimatedGoalCardState extends State<_AnimatedGoalCard>
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: _isPressed ? widget.goal.color.withValues(alpha: 0.05) : Colors.white,
+            color: Colors.white,
             borderRadius: BorderRadius.circular(AppTheme.radiusXl),
             border: Border.all(
-              color: _isPressed ? widget.goal.color.withValues(alpha: 0.3) : AppColors.gray100, 
+              color: _isPressed ? widget.goal.color : AppColors.gray100,
               width: 2,
             ),
             boxShadow: [
               BoxShadow(
-                color: _isPressed 
-                    ? widget.goal.color.withValues(alpha: 0.1)
-                    : Colors.black.withValues(alpha: 0.02),
+                color: _isPressed
+                    ? widget.goal.color.withValues(alpha: 0.15)
+                    : Colors.black.withValues(alpha: 0.04),
                 blurRadius: _isPressed ? 20 : 10,
                 offset: const Offset(0, 4),
               ),
@@ -1467,47 +1713,71 @@ class _AnimatedGoalCardState extends State<_AnimatedGoalCard>
           ),
           child: Row(
             children: [
+              // Icon container
               AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.all(16),
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
-                  color: widget.goal.color,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                  boxShadow: _isPressed
-                      ? [
-                          BoxShadow(
-                            color: widget.goal.color.withValues(alpha: 0.4),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : null,
+                  color: _isPressed
+                      ? widget.goal.color
+                      : widget.goal.color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: widget.goal.color.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
                 ),
-                child: Icon(widget.icon, color: Colors.white, size: 24),
+                child: AnimatedScale(
+                  scale: _isPressed ? 1.1 : 1.0,
+                  duration: const Duration(milliseconds: 150),
+                  child: Icon(
+                    widget.icon,
+                    size: 26,
+                    color: _isPressed ? Colors.white : widget.goal.color,
+                  ),
+                ),
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 16),
+              // Text content
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       widget.goal.label,
-                      style: AppTextStyles.h4.copyWith(color: AppColors.gray800),
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.gray800,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       widget.goal.description,
-                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.gray400),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.gray500,
+                      ),
                     ),
                   ],
                 ),
               ),
-              AnimatedRotation(
-                turns: _isPressed ? 0.05 : 0,
+              // Arrow indicator
+              AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _isPressed
+                      ? widget.goal.color
+                      : widget.goal.color.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
                 child: Icon(
-                  LucideIcons.chevronRight,
-                  color: _isPressed ? widget.goal.color : AppColors.gray300,
+                  LucideIcons.arrowRight,
+                  size: 18,
+                  color: _isPressed ? Colors.white : widget.goal.color,
                 ),
               ),
             ],
@@ -1534,12 +1804,12 @@ class _AnimatedEnergyCard extends StatefulWidget {
   State<_AnimatedEnergyCard> createState() => _AnimatedEnergyCardState();
 }
 
-class _AnimatedEnergyCardState extends State<_AnimatedEnergyCard> 
+class _AnimatedEnergyCardState extends State<_AnimatedEnergyCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   bool _isPressed = false;
-  
+
   @override
   void initState() {
     super.initState();
@@ -1551,13 +1821,13 @@ class _AnimatedEnergyCardState extends State<_AnimatedEnergyCard>
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
   }
-  
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -1578,49 +1848,262 @@ class _AnimatedEnergyCardState extends State<_AnimatedEnergyCard>
         scale: _scaleAnimation,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.all(AppTheme.spacing6),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: _isPressed 
-                ? widget.option.color.withValues(alpha: 0.15)
-                : widget.option.bg,
+            color: Colors.white,
             borderRadius: BorderRadius.circular(AppTheme.radiusXl),
             border: Border.all(
-              color: _isPressed ? widget.option.color : Colors.transparent, 
+              color: _isPressed ? widget.option.color : AppColors.gray100,
               width: 2,
             ),
-            boxShadow: _isPressed
-                ? [
-                    BoxShadow(
-                      color: widget.option.color.withValues(alpha: 0.2),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : null,
+            boxShadow: [
+              BoxShadow(
+                color: _isPressed
+                    ? widget.option.color.withValues(alpha: 0.15)
+                    : Colors.black.withValues(alpha: 0.04),
+                blurRadius: _isPressed ? 20 : 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Row(
             children: [
-              AnimatedScale(
-                scale: _isPressed ? 1.15 : 1.0,
+              // Icon container with gradient background
+              AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
-                child: Icon(widget.icon, size: 32, color: widget.option.color),
-              ),
-              const SizedBox(width: 16),
-              Text(
-                widget.option.value.displayName,
-                style: TextStyle(
-                  fontSize: 20, 
-                  fontWeight: FontWeight.w700, 
-                  color: widget.option.color,
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: _isPressed
+                      ? widget.option.color
+                      : widget.option.bg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: widget.option.color.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: AnimatedScale(
+                  scale: _isPressed ? 1.1 : 1.0,
+                  duration: const Duration(milliseconds: 150),
+                  child: Icon(
+                    widget.icon,
+                    size: 28,
+                    color: _isPressed ? Colors.white : widget.option.color,
+                  ),
                 ),
               ),
-              const Spacer(),
-              AnimatedSlide(
-                offset: Offset(_isPressed ? 0.2 : 0, 0),
+              const SizedBox(width: 16),
+              // Text content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.option.value.displayName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.gray800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.option.value.description,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.gray500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Arrow indicator
+              AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
-                child: Icon(LucideIcons.chevronRight, color: widget.option.color),
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _isPressed
+                      ? widget.option.color
+                      : widget.option.bg,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  LucideIcons.arrowRight,
+                  size: 18,
+                  color: _isPressed ? Colors.white : widget.option.color,
+                ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Animated lightbulb icon for mood tips with hover effect
+class _MoodTipIcon extends StatefulWidget {
+  final Color color;
+
+  const _MoodTipIcon({required this.color});
+
+  @override
+  State<_MoodTipIcon> createState() => _MoodTipIconState();
+}
+
+class _MoodTipIconState extends State<_MoodTipIcon>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => _controller.forward(),
+      onExit: (_) => _controller.reverse(),
+      child: AnimatedBuilder(
+        animation: _animation,
+        builder: (context, child) {
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              Opacity(
+                opacity: 1.0 - _animation.value,
+                child: Icon(
+                  HeroiconsOutline.lightBulb,
+                  size: 16,
+                  color: widget.color,
+                ),
+              ),
+              Opacity(
+                opacity: _animation.value,
+                child: Transform.scale(
+                  scale: 0.9 + (0.1 * _animation.value),
+                  child: Icon(
+                    HeroiconsSolid.lightBulb,
+                    size: 16,
+                    color: widget.color,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Animated icon for the hero card with hover/tap effects
+class _HeroCardIcon extends StatefulWidget {
+  final IconData outlineIcon;
+  final IconData solidIcon;
+
+  const _HeroCardIcon({
+    required this.outlineIcon,
+    required this.solidIcon,
+  });
+
+  @override
+  State<_HeroCardIcon> createState() => _HeroCardIconState();
+}
+
+class _HeroCardIconState extends State<_HeroCardIcon>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleHoverChange(bool isHovered) {
+    if (isHovered) {
+      _controller.forward();
+    } else {
+      _controller.reverse();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => _handleHoverChange(true),
+      onExit: (_) => _handleHoverChange(false),
+      child: Container(
+        width: 32,
+        height: 32,
+        margin: const EdgeInsets.only(right: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.3),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.transparent, width: 2),
+        ),
+        child: Center(
+          child: AnimatedBuilder(
+            animation: _animation,
+            builder: (context, child) {
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  Opacity(
+                    opacity: 1.0 - _animation.value,
+                    child: Icon(
+                      widget.outlineIcon,
+                      size: 16,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Opacity(
+                    opacity: _animation.value,
+                    child: Transform.scale(
+                      scale: 0.9 + (0.1 * _animation.value),
+                      child: Icon(
+                        widget.solidIcon,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),

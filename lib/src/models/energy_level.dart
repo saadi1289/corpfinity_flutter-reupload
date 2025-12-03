@@ -1,8 +1,9 @@
 enum EnergyLevel {
-  low('Low Battery'),
-  medium('Balanced'),
-  high('Fully Charged');
-  
+  low('Low Energy', 'Take it easy today'),
+  medium('Balanced', 'Ready for a moderate challenge'),
+  high('High Energy', 'Bring on the intensity!');
+
   final String displayName;
-  const EnergyLevel(this.displayName);
+  final String description;
+  const EnergyLevel(this.displayName, this.description);
 }

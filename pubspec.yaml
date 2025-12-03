@@ -22,10 +22,15 @@ dependencies:
   # UI & Fonts
   google_fonts: ^6.1.0
   lucide_icons_flutter: ^1.0.0
+  heroicons_flutter: ^0.3.0
   flutter_svg: ^2.0.9
   
   # Utils
   intl: ^0.19.0
+  
+  # Local Notifications
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.9.4
   
   # HTTP (for avatar URLs)
   http: ^1.1.0
@@ -44,3 +49,4 @@ flutter:
   
   assets:
     - .env
+    - assets/logo/

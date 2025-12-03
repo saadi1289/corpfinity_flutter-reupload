@@ -18,20 +18,22 @@ class _InsightsPageState extends State<InsightsPage> {
   List<ChallengeHistoryItem> _history = [];
   int _streak = 0;
   DateTime _currentDate = DateTime.now();
-  
+  bool _loading = true;
+
   @override
   void initState() {
     super.initState();
     _loadData();
   }
-  
+
   Future<void> _loadData() async {
     final history = await _storage.getHistory();
     final state = await _storage.getState();
-    
+
     setState(() {
       _history = history;
       _streak = state?['streak'] ?? 0;
+      _loading = false;
     });
   }
   
@@ -71,17 +73,97 @@ class _InsightsPageState extends State<InsightsPage> {
         date.month == now.month &&
         date.day == now.day;
   }
-  
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primary.withValues(alpha: 0.1),
+                    AppColors.secondary.withValues(alpha: 0.1),
+                  ],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                LucideIcons.chartBar,
+                size: 56,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 32),
+            Text(
+              'No Insights Yet',
+              style: AppTextStyles.h2.copyWith(color: AppColors.gray800),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Complete your first wellness challenge\nto start tracking your progress',
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.gray500,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.info.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                border: Border.all(color: AppColors.info.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(LucideIcons.lightbulb, size: 20, color: AppColors.info),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Tip: Start with a quick 1-minute challenge!',
+                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.info),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
+      );
+    }
+
+    if (_history.isEmpty && _streak == 0) {
+      return _buildEmptyState();
+    }
+
     final calendarDays = _getCalendarDays();
-    final months = ['January', 'February', 'March', 'April', 'May', 'June',
-                    'July', 'August', 'September', 'October', 'November', 'December'];
-    
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-      padding: const EdgeInsets.all(AppTheme.spacing6),
-      child: Column(
+    final months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      color: AppColors.primary,
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        padding: const EdgeInsets.all(AppTheme.spacing6),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 8),
@@ -400,6 +482,7 @@ class _InsightsPageState extends State<InsightsPage> {
           ),
         ],
       ),
+    ),
     );
   }
 }
