@@ -44,6 +44,7 @@ class AuthService {
   
   /// Get currently logged in user
   Future<User?> getUser() async {
-    return await _storage.getUser();
+    final result = await _storage.getUser();
+    return result.dataOrNull;
   }
 }

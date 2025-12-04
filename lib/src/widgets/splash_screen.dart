@@ -55,6 +55,12 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = screenSize.height < 600;
+    final logoSize = isSmallScreen ? 100.0 : (screenSize.width * 0.35).clamp(100.0, 140.0);
+    final titleSize = isSmallScreen ? 26.0 : 32.0;
+    final taglineSize = isSmallScreen ? 14.0 : 16.0;
+    
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -78,15 +84,15 @@ class _SplashScreenState extends State<SplashScreen>
                       // Logo
                       SvgPicture.asset(
                         'assets/logo/corpfinity_logo.svg',
-                        width: 140,
-                        height: 140,
+                        width: logoSize,
+                        height: logoSize,
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: isSmallScreen ? 16 : 24),
                       // App name
-                      const Text(
+                      Text(
                         'CorpFinity',
                         style: TextStyle(
-                          fontSize: 32,
+                          fontSize: titleSize,
                           fontWeight: FontWeight.w700,
                           color: AppColors.gray900,
                           letterSpacing: -0.5,
@@ -94,10 +100,10 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                       const SizedBox(height: 8),
                       // Tagline
-                      const Text(
+                      Text(
                         'Your Wellness Journey',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: taglineSize,
                           fontWeight: FontWeight.w500,
                           color: AppColors.gray500,
                           letterSpacing: 0.5,

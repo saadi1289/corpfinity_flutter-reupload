@@ -19,6 +19,7 @@ import '../constants.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/circular_timer.dart';
 import '../widgets/challenge_icon.dart';
+import '../widgets/tutorial_overlay.dart';
 import '../services/share_service.dart';
 import 'reminders_page.dart';
 
@@ -93,7 +94,8 @@ class _HomePageState extends State<HomePage> {
     _dailyQuote = AppConstants.quotes[Random().nextInt(AppConstants.quotes.length)];
     
     // Load water intake
-    final water = await _storage.getWaterIntake();
+    final waterResult = await _storage.getWaterIntake();
+    final water = waterResult.dataOrNull ?? (count: 0, date: '');
     final today = DateTime.now().toIso8601String().substring(0, 10);
     
     if (water.date == today) {
@@ -103,7 +105,8 @@ class _HomePageState extends State<HomePage> {
     }
     
     // Load state
-    final state = await _storage.getState();
+    final stateResult = await _storage.getState();
+    final state = stateResult.dataOrNull;
     if (state != null) {
       setState(() {
         _streak = state['streak'] ?? 0;
@@ -112,8 +115,8 @@ class _HomePageState extends State<HomePage> {
     }
     
     // Load reminders
-    final reminders = await _storage.getReminders();
-    setState(() => _reminders = reminders);
+    final remindersResult = await _storage.getReminders();
+    setState(() => _reminders = remindersResult.dataOrNull ?? []);
   }
   
   int _parseDuration(String duration) {
@@ -202,8 +205,8 @@ class _HomePageState extends State<HomePage> {
       MaterialPageRoute(builder: (context) => const RemindersPage()),
     );
     // Reload reminders when returning
-    final reminders = await _storage.getReminders();
-    setState(() => _reminders = reminders);
+    final remindersResult = await _storage.getReminders();
+    setState(() => _reminders = remindersResult.dataOrNull ?? []);
   }
   
   Future<void> _completeChallenge() async {
@@ -222,7 +225,8 @@ class _HomePageState extends State<HomePage> {
         funFact: _currentChallenge!.funFact,
       );
       
-      final history = await _storage.getHistory();
+      final historyResult = await _storage.getHistory();
+      final history = historyResult.dataOrNull ?? [];
       history.insert(0, historyItem);
       await _storage.saveHistory(history);
     }
@@ -377,6 +381,7 @@ class _HomePageState extends State<HomePage> {
           
           // Hero Card - Start Flow
           _HeroCard(
+            key: TutorialTargets.heroCard,
             onTap: () => setState(() => _currentStep = AppStep.goalSelection),
             child: Container(
                 height: 192,
@@ -499,6 +504,7 @@ class _HomePageState extends State<HomePage> {
     );
     
     return Container(
+      key: TutorialTargets.moodTracker,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -623,6 +629,7 @@ class _HomePageState extends State<HomePage> {
   // Continue with other builder methods in next message
   Widget _buildHydrationTracker() {
     return Container(
+      key: TutorialTargets.hydration,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.info.withValues(alpha: 0.05),
@@ -1512,6 +1519,7 @@ class _HeroCard extends StatefulWidget {
   final Widget child;
   
   const _HeroCard({
+    super.key,
     required this.onTap,
     required this.child,
   });

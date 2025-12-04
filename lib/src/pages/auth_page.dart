@@ -149,37 +149,49 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
           // Main content
           SafeArea(
             child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Logo
-                    RotationTransition(
-                      turns: Tween<double>(begin: 0, end: 0.05).animate(_rotationController),
-                      child: Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(32),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.2),
-                              blurRadius: 30,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
-                        ),
-                        padding: const EdgeInsets.all(16),
-                        child: SvgPicture.asset(
-                          'assets/logo/corpfinity_logo.svg',
-                          width: 68,
-                          height: 68,
-                        ),
-                      ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isSmallScreen = constraints.maxHeight < 700;
+                  final isNarrow = constraints.maxWidth < 360;
+                  final horizontalPadding = isNarrow ? 20.0 : 32.0;
+                  final logoSize = isSmallScreen ? 80.0 : 100.0;
+                  
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                      vertical: isSmallScreen ? 16 : 32,
                     ),
-                    const SizedBox(height: 32),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 400),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Logo
+                          RotationTransition(
+                            turns: Tween<double>(begin: 0, end: 0.05).animate(_rotationController),
+                            child: Container(
+                              width: logoSize,
+                              height: logoSize,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(logoSize * 0.32),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.primary.withValues(alpha: 0.2),
+                                    blurRadius: 30,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ],
+                              ),
+                              padding: EdgeInsets.all(logoSize * 0.16),
+                              child: SvgPicture.asset(
+                                'assets/logo/corpfinity_logo.svg',
+                                width: logoSize * 0.68,
+                                height: logoSize * 0.68,
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: isSmallScreen ? 20 : 32),
                     
                     // Title
                     AnimatedSwitcher(
@@ -390,28 +402,32 @@ class _AuthPageState extends State<AuthPage> with SingleTickerProviderStateMixin
                     ),
                     const SizedBox(height: 40),
                     
-                    // Toggle signup/login
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          _isSignUp ? 'Already have an account?' : 'Don\'t have an account?',
-                          style: AppTextStyles.bodySmall.copyWith(color: AppColors.gray500),
-                        ),
-                        TextButton(
-                          onPressed: _toggleSignUp,
-                          child: Text(
-                            _isSignUp ? 'Sign In' : 'Sign Up',
-                            style: AppTextStyles.bodySmall.copyWith(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          // Toggle signup/login
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                _isSignUp ? 'Already have an account?' : 'Don\'t have an account?',
+                                style: AppTextStyles.bodySmall.copyWith(color: AppColors.gray500),
+                              ),
+                              TextButton(
+                                onPressed: _toggleSignUp,
+                                child: Text(
+                                  _isSignUp ? 'Sign In' : 'Sign Up',
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           ),

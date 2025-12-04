@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/challenge_icon.dart';
 import '../widgets/error_state.dart';
+import '../widgets/skeleton_loader.dart';
 
 class ChallengesPage extends StatefulWidget {
   final String initialTab;
@@ -46,7 +47,10 @@ class _ChallengesPageState extends State<ChallengesPage> {
     });
 
     try {
-      final history = await _storage.getHistory();
+      final historyResult = await _storage.getHistory();
+      if (!mounted) return;
+      
+      final history = historyResult.dataOrNull ?? [];
       setState(() {
         _history = history;
         _breathingSessions = history.where((h) {
@@ -60,6 +64,7 @@ class _ChallengesPageState extends State<ChallengesPage> {
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _loading = false;
@@ -70,9 +75,7 @@ class _ChallengesPageState extends State<ChallengesPage> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
-      );
+      return const ChallengesPageSkeleton();
     }
 
     if (_error != null) {
@@ -238,79 +241,99 @@ class _ChallengesPageState extends State<ChallengesPage> {
     final progress = completed / totalGoals;
     final percentage = (progress * 100).round();
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primary.withValues(alpha: 0.1),
-            AppColors.secondary.withValues(alpha: 0.1),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        children: [
-          // Custom circular progress
-          SizedBox(
-            width: 80,
-            height: 80,
-            child: CustomPaint(
-              painter: _CircularProgressPainter(
-                progress: progress,
-                backgroundColor: AppColors.gray200,
-                progressColor: AppColors.primary,
-                strokeWidth: 8,
-              ),
-              child: Center(
-                child: Text(
-                  '$percentage%',
-                  style: AppTextStyles.h4.copyWith(color: AppColors.primary),
-                ),
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isSmall = constraints.maxWidth < 320;
+        final circleSize = isSmall ? 64.0 : 80.0;
+        final padding = isSmall ? 14.0 : 20.0;
+        
+        return Container(
+          padding: EdgeInsets.all(padding),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.primary.withValues(alpha: 0.1),
+                AppColors.secondary.withValues(alpha: 0.1),
+              ],
             ),
+            borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+            border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
           ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Today\'s Progress',
-                  style: AppTextStyles.h4.copyWith(color: AppColors.gray800),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$completed of $totalGoals goals completed',
-                  style:
-                      AppTextStyles.caption.copyWith(color: AppColors.gray500),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      _getMotivationalIcon(percentage),
-                      size: 16,
-                      color: AppColors.primary,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _getMotivationalMessage(percentage),
-                      style: AppTextStyles.bodySmall.copyWith(
+          child: Row(
+            children: [
+              // Custom circular progress
+              SizedBox(
+                width: circleSize,
+                height: circleSize,
+                child: CustomPaint(
+                  painter: _CircularProgressPainter(
+                    progress: progress,
+                    backgroundColor: AppColors.gray200,
+                    progressColor: AppColors.primary,
+                    strokeWidth: isSmall ? 6 : 8,
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$percentage%',
+                      style: AppTextStyles.h4.copyWith(
                         color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
+                        fontSize: isSmall ? 14 : 17,
                       ),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: isSmall ? 12 : 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Today\'s Progress',
+                      style: AppTextStyles.h4.copyWith(
+                        color: AppColors.gray800,
+                        fontSize: isSmall ? 15 : 17,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$completed of $totalGoals goals completed',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.gray500,
+                        fontSize: isSmall ? 11 : 13,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          _getMotivationalIcon(percentage),
+                          size: isSmall ? 14 : 16,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            _getMotivationalMessage(percentage),
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: isSmall ? 12 : 14,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

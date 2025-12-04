@@ -5,6 +5,7 @@ import '../services/storage_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_text_styles.dart';
+import '../widgets/skeleton_loader.dart';
 
 class InsightsPage extends StatefulWidget {
   const InsightsPage({super.key});
@@ -19,6 +20,7 @@ class _InsightsPageState extends State<InsightsPage> {
   int _streak = 0;
   DateTime _currentDate = DateTime.now();
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -27,14 +29,29 @@ class _InsightsPageState extends State<InsightsPage> {
   }
 
   Future<void> _loadData() async {
-    final history = await _storage.getHistory();
-    final state = await _storage.getState();
-
     setState(() {
-      _history = history;
-      _streak = state?['streak'] ?? 0;
-      _loading = false;
+      _loading = true;
+      _error = null;
     });
+
+    try {
+      final historyResult = await _storage.getHistory();
+      final stateResult = await _storage.getState();
+
+      if (!mounted) return;
+
+      setState(() {
+        _history = historyResult.dataOrNull ?? [];
+        _streak = stateResult.dataOrNull?['streak'] ?? 0;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Failed to load insights';
+        _loading = false;
+      });
+    }
   }
   
   void _changeMonth(int delta) {
@@ -72,6 +89,53 @@ class _InsightsPageState extends State<InsightsPage> {
     return date.year == now.year &&
         date.month == now.month &&
         date.day == now.day;
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                LucideIcons.circleAlert,
+                size: 48,
+                color: AppColors.error,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Something went wrong',
+              style: AppTextStyles.h3.copyWith(color: AppColors.gray800),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _error ?? 'Failed to load data',
+              style: AppTextStyles.body.copyWith(color: AppColors.gray500),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadData,
+              icon: const Icon(LucideIcons.refreshCw, size: 18),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildEmptyState() {
@@ -126,9 +190,11 @@ class _InsightsPageState extends State<InsightsPage> {
                 children: [
                   const Icon(LucideIcons.lightbulb, size: 20, color: AppColors.info),
                   const SizedBox(width: 12),
-                  Text(
-                    'Tip: Start with a quick 1-minute challenge!',
-                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.info),
+                  Flexible(
+                    child: Text(
+                      'Tip: Start with a quick 1-minute challenge!',
+                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.info),
+                    ),
                   ),
                 ],
               ),
@@ -142,9 +208,11 @@ class _InsightsPageState extends State<InsightsPage> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
-      );
+      return const InsightsPageSkeleton();
+    }
+
+    if (_error != null) {
+      return _buildErrorState();
     }
 
     if (_history.isEmpty && _streak == 0) {
@@ -172,95 +240,124 @@ class _InsightsPageState extends State<InsightsPage> {
           Text('Your progress at a glance', style: AppTextStyles.bodySmall.copyWith(color: AppColors.gray500)),
           const SizedBox(height: AppTheme.spacing6),
           
-          // Stats Grid
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.secondary, AppColors.accent],
+          // Stats Grid - responsive
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isSmall = constraints.maxWidth < 340;
+              final padding = isSmall ? 14.0 : 20.0;
+              final streakFontSize = isSmall ? 32.0 : 40.0;
+              
+              return Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: EdgeInsets.all(padding),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [AppColors.secondary, AppColors.accent],
+                        ),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.secondary.withValues(alpha: 0.3),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(LucideIcons.flame, size: isSmall ? 14 : 18, color: Colors.white),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'STREAK',
+                                  style: AppTextStyles.tiny.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    fontSize: isSmall ? 9 : 11,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '$_streak',
+                            style: TextStyle(color: Colors.white, fontSize: streakFontSize, fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Days in a row',
+                            style: AppTextStyles.caption.copyWith(
+                              color: Colors.white.withValues(alpha: 0.8),
+                              fontSize: isSmall ? 11 : 13,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.secondary.withValues(alpha: 0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(LucideIcons.flame, size: 18, color: Colors.white),
-                          const SizedBox(width: 8),
-                          Text(
-                            'STREAK',
-                            style: AppTextStyles.tiny.copyWith(color: Colors.white.withValues(alpha: 0.9)),
+                  SizedBox(width: isSmall ? 10 : 16),
+                  Expanded(
+                    child: Container(
+                      padding: EdgeInsets.all(padding),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                        border: Border.all(color: AppColors.gray100),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.02),
+                            blurRadius: 10,
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '$_streak',
-                        style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Days in a row',
-                        style: AppTextStyles.caption.copyWith(color: Colors.white.withValues(alpha: 0.8)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-                    border: Border.all(color: AppColors.gray100),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.02),
-                        blurRadius: 10,
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(LucideIcons.award, size: 18, color: AppColors.primary),
-                          const SizedBox(width: 8),
+                          Row(
+                            children: [
+                              Icon(LucideIcons.award, size: isSmall ? 14 : 18, color: AppColors.primary),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'TOTAL',
+                                  style: AppTextStyles.tiny.copyWith(
+                                    color: AppColors.gray400,
+                                    fontSize: isSmall ? 9 : 11,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
                           Text(
-                            'TOTAL',
-                            style: AppTextStyles.tiny.copyWith(color: AppColors.gray400),
+                            '${_history.length}',
+                            style: AppTextStyles.display.copyWith(
+                              color: AppColors.gray900,
+                              fontSize: streakFontSize,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Sessions completed',
+                            style: AppTextStyles.caption.copyWith(
+                              color: AppColors.gray400,
+                              fontSize: isSmall ? 11 : 13,
+                            ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${_history.length}',
-                        style: AppTextStyles.display.copyWith(color: AppColors.gray900),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Sessions completed',
-                        style: AppTextStyles.caption.copyWith(color: AppColors.gray400),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
           const SizedBox(height: AppTheme.spacing6),
           
@@ -306,66 +403,76 @@ class _InsightsPageState extends State<InsightsPage> {
                 ),
                 const SizedBox(height: AppTheme.spacing6),
                 
-                // Week days header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day) {
-                    return SizedBox(
-                      width: 32,
-                      child: Text(
-                        day,
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.captionBold.copyWith(color: AppColors.gray300),
-                      ),
+                // Week days header - responsive
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final cellSize = (constraints.maxWidth - 48) / 7;
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day) {
+                        return SizedBox(
+                          width: cellSize,
+                          child: Text(
+                            day,
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.captionBold.copyWith(color: AppColors.gray300),
+                          ),
+                        );
+                      }).toList(),
                     );
-                  }).toList(),
+                  },
                 ),
                 const SizedBox(height: 16),
                 
-                // Calendar grid
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 16,
-                  children: calendarDays.map((date) {
-                    if (date == null) {
-                      return const SizedBox(width: 32, height: 32);
-                    }
-                    
-                    final hasActivity = _hasActivity(date);
-                    final isToday = _isToday(date);
-                    
-                    return Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: hasActivity ? AppColors.primary : Colors.transparent,
-                        shape: BoxShape.circle,
-                        border: isToday && !hasActivity
-                            ? Border.all(color: AppColors.primary, width: 2)
-                            : null,
-                        boxShadow: hasActivity
-                            ? [
-                                BoxShadow(
-                                  color: AppColors.primary.withValues(alpha: 0.3),
-                                  blurRadius: 8,
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${date.day}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: hasActivity
-                                ? Colors.white
-                                : (isToday ? AppColors.primary : AppColors.gray600),
+                // Calendar grid - responsive
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final cellSize = (constraints.maxWidth - 48) / 7; // 7 days, 6 gaps of 8px
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 12,
+                      children: calendarDays.map((date) {
+                        if (date == null) {
+                          return SizedBox(width: cellSize, height: cellSize);
+                        }
+                        
+                        final hasActivity = _hasActivity(date);
+                        final isToday = _isToday(date);
+                        
+                        return Container(
+                          width: cellSize,
+                          height: cellSize,
+                          decoration: BoxDecoration(
+                            color: hasActivity ? AppColors.primary : Colors.transparent,
+                            shape: BoxShape.circle,
+                            border: isToday && !hasActivity
+                                ? Border.all(color: AppColors.primary, width: 2)
+                                : null,
+                            boxShadow: hasActivity
+                                ? [
+                                    BoxShadow(
+                                      color: AppColors.primary.withValues(alpha: 0.3),
+                                      blurRadius: 8,
+                                    ),
+                                  ]
+                                : null,
                           ),
-                        ),
-                      ),
+                          child: Center(
+                            child: Text(
+                              '${date.day}',
+                              style: TextStyle(
+                                fontSize: cellSize * 0.38,
+                                fontWeight: FontWeight.w500,
+                                color: hasActivity
+                                    ? Colors.white
+                                    : (isToday ? AppColors.primary : AppColors.gray600),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
                     );
-                  }).toList(),
+                  },
                 ),
                 const SizedBox(height: AppTheme.spacing6),
                 
@@ -441,41 +548,48 @@ class _InsightsPageState extends State<InsightsPage> {
                 ),
                 const SizedBox(height: AppTheme.spacing6),
                 
-                // Bar chart
-                SizedBox(
-                  height: 96,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [65, 40, 100, 30, 80, 20, 50].asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final height = entry.value;
-                      final days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-                      
-                      return Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Container(
-                            width: 32,
-                            height: 72 * (height / 100),
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.bottomCenter,
-                                end: Alignment.topCenter,
-                                colors: [AppColors.primary, AppColors.secondary],
+                // Bar chart - responsive
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final barWidth = (constraints.maxWidth - 72) / 7; // 7 bars with gaps
+                    final clampedBarWidth = barWidth.clamp(20.0, 40.0);
+                    
+                    return SizedBox(
+                      height: 96,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [65, 40, 100, 30, 80, 20, 50].asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final height = entry.value;
+                          final days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+                          
+                          return Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Container(
+                                width: clampedBarWidth,
+                                height: 72 * (height / 100),
+                                decoration: const BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
+                                    colors: [AppColors.primary, AppColors.secondary],
+                                  ),
+                                  borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
+                                ),
                               ),
-                              borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            days[index],
-                            style: AppTextStyles.tiny.copyWith(color: AppColors.gray500),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-                  ),
+                              const SizedBox(height: 8),
+                              Text(
+                                days[index],
+                                style: AppTextStyles.tiny.copyWith(color: AppColors.gray500),
+                              ),
+                            ],
+                          );
+                        }).toList(),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),

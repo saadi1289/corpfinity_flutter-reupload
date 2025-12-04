@@ -41,60 +41,69 @@ class ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                size: 48,
-                color: AppColors.error,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              title,
-              style: AppTextStyles.h3.copyWith(color: AppColors.gray800),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              style: AppTextStyles.body.copyWith(
-                color: AppColors.gray500,
-                height: 1.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            if (onRetry != null) ...[
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(LucideIcons.refreshCw, size: 18),
-                label: const Text('Try Again'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
+    return Semantics(
+      label: '$title. $message${onRetry != null ? ". Tap try again to retry." : ""}',
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ExcludeSemantics(
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  child: Icon(
+                    icon,
+                    size: 48,
+                    color: AppColors.error,
                   ),
                 ),
               ),
+              const SizedBox(height: 24),
+              Text(
+                title,
+                style: AppTextStyles.h3.copyWith(color: AppColors.gray800),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.gray500,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              if (onRetry != null) ...[
+                const SizedBox(height: 24),
+                Semantics(
+                  button: true,
+                  label: 'Try again',
+                  child: ElevatedButton.icon(
+                    onPressed: onRetry,
+                    icon: const Icon(LucideIcons.refreshCw, size: 18),
+                    label: const Text('Try Again'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/app_view.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
+import 'tutorial_overlay.dart';
 
 class BottomNavbar extends StatelessWidget {
   final AppView currentView;
@@ -25,6 +26,7 @@ class BottomNavbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
+      key: TutorialTargets.bottomNav,
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.surface,
@@ -127,19 +129,29 @@ class _NavItemState extends State<_NavItem> with SingleTickerProviderStateMixin 
   
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: _handleTapDown,
-      onTapUp: _handleTapUp,
-      onTapCancel: _handleTapCancel,
-      behavior: HitTestBehavior.opaque,
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: widget.isActive 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final horizontalPadding = isSmallScreen ? 10.0 : 16.0;
+    final iconSize = isSmallScreen ? 20.0 : 22.0;
+    final fontSize = isSmallScreen ? 10.0 : 11.0;
+    
+    return Semantics(
+      button: true,
+      selected: widget.isActive,
+      label: '${widget.label} tab${widget.isActive ? ", selected" : ""}',
+      child: GestureDetector(
+        onTapDown: _handleTapDown,
+        onTapUp: _handleTapUp,
+        onTapCancel: _handleTapCancel,
+        behavior: HitTestBehavior.opaque,
+        child: ScaleTransition(
+          scale: _scaleAnimation,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 10),
+            decoration: BoxDecoration(
+              color: widget.isActive 
                 ? AppColors.primary.withValues(alpha: 0.1)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(16),
@@ -155,7 +167,7 @@ class _NavItemState extends State<_NavItem> with SingleTickerProviderStateMixin 
                 builder: (context, value, child) {
                   return Icon(
                     widget.icon,
-                    size: 22,
+                    size: iconSize,
                     color: Color.lerp(
                       AppColors.gray400,
                       AppColors.primary,
@@ -175,7 +187,7 @@ class _NavItemState extends State<_NavItem> with SingleTickerProviderStateMixin 
                   return Text(
                     widget.label,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: fontSize,
                       fontWeight: value > 0.5 ? FontWeight.w600 : FontWeight.w500,
                       color: Color.lerp(AppColors.gray400, AppColors.primary, value),
                       letterSpacing: 0.2,
@@ -185,6 +197,7 @@ class _NavItemState extends State<_NavItem> with SingleTickerProviderStateMixin 
               ),
             ],
           ),
+        ),
         ),
       ),
     );

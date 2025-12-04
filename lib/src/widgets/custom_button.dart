@@ -122,74 +122,79 @@ class _CustomButtonState extends State<CustomButton>
   Widget build(BuildContext context) {
     final isDisabled = widget.onPressed == null;
     
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: GestureDetector(
-        onTapDown: isDisabled ? null : (_) {
-          setState(() => _isPressed = true);
-          _controller.forward();
-        },
-        onTapUp: isDisabled ? null : (_) {
-          setState(() => _isPressed = false);
-          _controller.reverse();
-          widget.onPressed!();
-        },
-        onTapCancel: () {
-          setState(() => _isPressed = false);
-          _controller.reverse();
-        },
-        child: AnimatedBuilder(
-          animation: _scaleAnimation,
-          builder: (context, child) {
-            return Transform.scale(
-              scale: isDisabled ? 1.0 : _scaleAnimation.value,
-              child: child,
-            );
+    return Semantics(
+      button: true,
+      enabled: !isDisabled,
+      label: widget.isLoading ? '${widget.text}, loading' : widget.text,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: GestureDetector(
+          onTapDown: isDisabled ? null : (_) {
+            setState(() => _isPressed = true);
+            _controller.forward();
           },
-          child: AnimatedOpacity(
-            duration: const Duration(milliseconds: 150),
-            opacity: isDisabled ? 0.5 : 1.0,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOutCubic,
-              width: widget.fullWidth ? double.infinity : null,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 15,
-              ),
-              decoration: _decoration,
-              child: widget.isLoading
-                  ? Center(
-                      child: SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            widget.variant == ButtonVariant.primary 
-                                ? Colors.white 
-                                : AppColors.primary,
+          onTapUp: isDisabled ? null : (_) {
+            setState(() => _isPressed = false);
+            _controller.reverse();
+            widget.onPressed!();
+          },
+          onTapCancel: () {
+            setState(() => _isPressed = false);
+            _controller.reverse();
+          },
+          child: AnimatedBuilder(
+            animation: _scaleAnimation,
+            builder: (context, child) {
+              return Transform.scale(
+                scale: isDisabled ? 1.0 : _scaleAnimation.value,
+                child: child,
+              );
+            },
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 150),
+              opacity: isDisabled ? 0.5 : 1.0,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                width: widget.fullWidth ? double.infinity : null,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 15,
+                ),
+                decoration: _decoration,
+                child: widget.isLoading
+                    ? Center(
+                        child: SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              widget.variant == ButtonVariant.primary 
+                                  ? Colors.white 
+                                  : AppColors.primary,
+                            ),
                           ),
                         ),
-                      ),
-                    )
-                  : Row(
-                      mainAxisSize: widget.fullWidth ? MainAxisSize.max : MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (widget.icon != null) ...[
-                          widget.icon!,
-                          const SizedBox(width: 10),
+                      )
+                    : Row(
+                        mainAxisSize: widget.fullWidth ? MainAxisSize.max : MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (widget.icon != null) ...[
+                            ExcludeSemantics(child: widget.icon!),
+                            const SizedBox(width: 10),
+                          ],
+                          Text(
+                            widget.text,
+                            style: AppTextStyles.button.copyWith(
+                              color: _textColor,
+                            ),
+                          ),
                         ],
-                        Text(
-                          widget.text,
-                          style: AppTextStyles.button.copyWith(
-                            color: _textColor,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+              ),
             ),
           ),
         ),

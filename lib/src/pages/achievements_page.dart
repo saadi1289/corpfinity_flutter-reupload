@@ -27,9 +27,12 @@ class _AchievementsPageState extends State<AchievementsPage> {
   }
 
   Future<void> _loadData() async {
-    final history = await _storage.getHistory();
-    final state = await _storage.getState();
+    final historyResult = await _storage.getHistory();
+    final stateResult = await _storage.getState();
 
+    final history = historyResult.dataOrNull ?? [];
+    final state = stateResult.dataOrNull;
+    
     final streak = state?['streak'] ?? 0;
     final totalChallenges = history.length;
 

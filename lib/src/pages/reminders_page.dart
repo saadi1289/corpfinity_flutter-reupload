@@ -27,9 +27,9 @@ class _RemindersPageState extends State<RemindersPage> {
   }
 
   Future<void> _loadReminders() async {
-    final reminders = await _storage.getReminders();
+    final remindersResult = await _storage.getReminders();
     setState(() {
-      _reminders = reminders;
+      _reminders = remindersResult.dataOrNull ?? [];
       _loading = false;
     });
   }
@@ -657,46 +657,52 @@ class _AddReminderSheetState extends State<AddReminderSheet> {
               }).toList(),
             ),
 
-            // Custom days selector
+            // Custom days selector - responsive
             if (_selectedFrequency == ReminderFrequency.custom) ...[
               const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: List.generate(7, (index) {
-                  final day = index + 1;
-                  final isSelected = _selectedDays.contains(day);
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        if (isSelected) {
-                          _selectedDays.remove(day);
-                        } else {
-                          _selectedDays.add(day);
-                        }
-                      });
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary : AppColors.gray50,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isSelected ? AppColors.primary : AppColors.gray200,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          _dayLabels[index],
-                          style: AppTextStyles.captionBold.copyWith(
-                            color: isSelected ? Colors.white : AppColors.gray600,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final daySize = ((constraints.maxWidth - 36) / 7).clamp(32.0, 44.0);
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: List.generate(7, (index) {
+                      final day = index + 1;
+                      final isSelected = _selectedDays.contains(day);
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            if (isSelected) {
+                              _selectedDays.remove(day);
+                            } else {
+                              _selectedDays.add(day);
+                            }
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: daySize,
+                          height: daySize,
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppColors.primary : AppColors.gray50,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isSelected ? AppColors.primary : AppColors.gray200,
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              _dayLabels[index],
+                              style: AppTextStyles.captionBold.copyWith(
+                                color: isSelected ? Colors.white : AppColors.gray600,
+                                fontSize: daySize * 0.32,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
+                      );
+                    }),
                   );
-                }),
+                },
               ),
             ],
             const SizedBox(height: 32),

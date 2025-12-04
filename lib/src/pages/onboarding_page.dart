@@ -286,6 +286,10 @@ class _OnboardingPageState extends State<OnboardingPage>
     return AnimatedBuilder(
       animation: _contentController,
       builder: (context, child) {
+        final screenHeight = MediaQuery.of(context).size.height;
+        final isSmallScreen = screenHeight < 700;
+        final horizontalPadding = isSmallScreen ? 24.0 : 32.0;
+        
         final slideAnimation = Tween<Offset>(
           begin: const Offset(0, 0.1),
           end: Offset.zero,
@@ -318,7 +322,7 @@ class _OnboardingPageState extends State<OnboardingPage>
         ));
 
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -330,7 +334,7 @@ class _OnboardingPageState extends State<OnboardingPage>
                   child: _buildAnimatedIcon(item),
                 ),
               ),
-              const SizedBox(height: 48),
+              SizedBox(height: isSmallScreen ? 32 : 48),
 
               // Title with staggered animation
               SlideTransition(
@@ -348,7 +352,7 @@ class _OnboardingPageState extends State<OnboardingPage>
                       item.title,
                       style: AppTextStyles.h1.copyWith(
                         color: Colors.white,
-                        fontSize: 28,
+                        fontSize: isSmallScreen ? 24 : 28,
                         height: 1.2,
                       ),
                       textAlign: TextAlign.center,
@@ -356,7 +360,7 @@ class _OnboardingPageState extends State<OnboardingPage>
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: isSmallScreen ? 14 : 20),
 
               // Description with staggered animation
               SlideTransition(
@@ -367,8 +371,8 @@ class _OnboardingPageState extends State<OnboardingPage>
                     item.description,
                     style: AppTextStyles.body.copyWith(
                       color: AppColors.gray600,
-                      height: 1.7,
-                      fontSize: 16,
+                      height: 1.6,
+                      fontSize: isSmallScreen ? 14 : 16,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -382,105 +386,115 @@ class _OnboardingPageState extends State<OnboardingPage>
   }
 
   Widget _buildAnimatedIcon(OnboardingItem item) {
-    return AnimatedBuilder(
-      animation: Listenable.merge([_floatController, _pulseController]),
-      builder: (context, child) {
-        final floatValue = math.sin(_floatController.value * math.pi) * 8;
-        final pulseValue = 1.0 + (_pulseController.value * 0.08);
-        final glowOpacity = 0.3 + (_pulseController.value * 0.2);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Responsive icon size based on available width
+        final screenWidth = MediaQuery.of(context).size.width;
+        final screenHeight = MediaQuery.of(context).size.height;
+        final isSmallScreen = screenHeight < 700;
+        final iconContainerSize = isSmallScreen 
+            ? (screenWidth * 0.32).clamp(100.0, 130.0)
+            : (screenWidth * 0.38).clamp(120.0, 150.0);
+        final borderRadius = iconContainerSize * 0.3;
+        final iconSize = iconContainerSize * 0.47;
+        final logoSize = iconContainerSize * 0.67;
+        
+        return AnimatedBuilder(
+          animation: Listenable.merge([_floatController, _pulseController]),
+          builder: (context, child) {
+            final floatValue = math.sin(_floatController.value * math.pi) * (isSmallScreen ? 5 : 8);
+            final pulseValue = 1.0 + (_pulseController.value * 0.08);
+            final glowOpacity = 0.3 + (_pulseController.value * 0.2);
 
-        return Transform.translate(
-          offset: Offset(0, floatValue),
-          child: Transform.scale(
-            scale: pulseValue,
-            child: Container(
-              width: 150,
-              height: 150,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: item.gradient,
-                ),
-                borderRadius: BorderRadius.circular(45),
-                boxShadow: [
-                  // Outer glow
-                  BoxShadow(
-                    color: item.gradient[0].withValues(alpha: glowOpacity),
-                    blurRadius: 40,
-                    spreadRadius: 5,
-                  ),
-                  // Inner shadow for depth
-                  BoxShadow(
-                    color: item.gradient[1].withValues(alpha: 0.5),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  ),
-                  // Colored shadow
-                  BoxShadow(
-                    color: item.gradient[0].withValues(alpha: 0.4),
-                    blurRadius: 30,
-                    offset: const Offset(0, 15),
-                  ),
-                ],
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Shimmer effect
-                  Positioned.fill(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(45),
-                      child: AnimatedBuilder(
-                        animation: _pulseController,
-                        builder: (context, child) {
-                          return Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment(
-                                  -1 + (_pulseController.value * 2),
-                                  -1,
-                                ),
-                                end: Alignment(
-                                  _pulseController.value * 2,
-                                  1,
-                                ),
-                                colors: [
-                                  Colors.white.withValues(alpha: 0),
-                                  Colors.white.withValues(alpha: 0.2),
-                                  Colors.white.withValues(alpha: 0),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+            return Transform.translate(
+              offset: Offset(0, floatValue),
+              child: Transform.scale(
+                scale: pulseValue,
+                child: Container(
+                  width: iconContainerSize,
+                  height: iconContainerSize,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: item.gradient,
                     ),
+                    borderRadius: BorderRadius.circular(borderRadius),
+                    boxShadow: [
+                      BoxShadow(
+                        color: item.gradient[0].withValues(alpha: glowOpacity),
+                        blurRadius: 40,
+                        spreadRadius: 5,
+                      ),
+                      BoxShadow(
+                        color: item.gradient[1].withValues(alpha: 0.5),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                      BoxShadow(
+                        color: item.gradient[0].withValues(alpha: 0.4),
+                        blurRadius: 30,
+                        offset: const Offset(0, 15),
+                      ),
+                    ],
                   ),
-                  // Icon or Logo
-                  if (item.isLogo)
-                    Padding(
-                      padding: const EdgeInsets.all(25),
-                      child: SvgPicture.asset(
-                        'assets/logo/corpfinity_logo.svg',
-                        width: 100,
-                        height: 100,
-                        colorFilter: const ColorFilter.mode(
-                          Colors.white,
-                          BlendMode.srcIn,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Positioned.fill(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(borderRadius),
+                          child: AnimatedBuilder(
+                            animation: _pulseController,
+                            builder: (context, child) {
+                              return Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment(
+                                      -1 + (_pulseController.value * 2),
+                                      -1,
+                                    ),
+                                    end: Alignment(
+                                      _pulseController.value * 2,
+                                      1,
+                                    ),
+                                    colors: [
+                                      Colors.white.withValues(alpha: 0),
+                                      Colors.white.withValues(alpha: 0.2),
+                                      Colors.white.withValues(alpha: 0),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                         ),
                       ),
-                    )
-                  else
-                    Icon(
-                      item.icon,
-                      size: 70,
-                      color: Colors.white,
-                    ),
-                ],
+                      if (item.isLogo)
+                        Padding(
+                          padding: EdgeInsets.all(iconContainerSize * 0.17),
+                          child: SvgPicture.asset(
+                            'assets/logo/corpfinity_logo.svg',
+                            width: logoSize,
+                            height: logoSize,
+                            colorFilter: const ColorFilter.mode(
+                              Colors.white,
+                              BlendMode.srcIn,
+                            ),
+                          ),
+                        )
+                      else
+                        Icon(
+                          item.icon,
+                          size: iconSize,
+                          color: Colors.white,
+                        ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );

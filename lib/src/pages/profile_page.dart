@@ -70,8 +70,11 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   Future<void> _loadStats() async {
-    final history = await _storage.getHistory();
-    final state = await _storage.getState();
+    final historyResult = await _storage.getHistory();
+    final stateResult = await _storage.getState();
+    
+    final history = historyResult.dataOrNull ?? [];
+    final state = stateResult.dataOrNull;
 
     int totalMins = 0;
     for (final item in history) {
@@ -793,35 +796,45 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   Widget _buildStatsRow() {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildStatCard(
-            icon: LucideIcons.flame,
-            value: '$_currentStreak',
-            label: 'Day Streak',
-            color: AppColors.warning,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard(
-            icon: LucideIcons.target,
-            value: '$_totalChallenges',
-            label: 'Challenges',
-            color: AppColors.secondary,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard(
-            icon: LucideIcons.clock,
-            value: '$_totalMinutes',
-            label: 'Minutes',
-            color: AppColors.info,
-          ),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isSmall = constraints.maxWidth < 320;
+        final gap = isSmall ? 8.0 : 12.0;
+        
+        return Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                icon: LucideIcons.flame,
+                value: '$_currentStreak',
+                label: 'Day Streak',
+                color: AppColors.warning,
+                isSmall: isSmall,
+              ),
+            ),
+            SizedBox(width: gap),
+            Expanded(
+              child: _buildStatCard(
+                icon: LucideIcons.target,
+                value: '$_totalChallenges',
+                label: 'Challenges',
+                color: AppColors.secondary,
+                isSmall: isSmall,
+              ),
+            ),
+            SizedBox(width: gap),
+            Expanded(
+              child: _buildStatCard(
+                icon: LucideIcons.clock,
+                value: '$_totalMinutes',
+                label: 'Minutes',
+                color: AppColors.info,
+                isSmall: isSmall,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -830,9 +843,13 @@ class _ProfilePageState extends State<ProfilePage>
     required String value,
     required String label,
     required Color color,
+    bool isSmall = false,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      padding: EdgeInsets.symmetric(
+        vertical: isSmall ? 12 : 16,
+        horizontal: isSmall ? 8 : 12,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
@@ -840,16 +857,28 @@ class _ProfilePageState extends State<ProfilePage>
       ),
       child: Column(
         children: [
-          Icon(icon, size: 20, color: color),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: AppTextStyles.h3.copyWith(color: AppColors.gray900),
+          Icon(icon, size: isSmall ? 16 : 20, color: color),
+          SizedBox(height: isSmall ? 6 : 8),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: AppTextStyles.h3.copyWith(
+                color: AppColors.gray900,
+                fontSize: isSmall ? 18 : 20,
+              ),
+            ),
           ),
           const SizedBox(height: 2),
-          Text(
-            label,
-            style: AppTextStyles.tiny.copyWith(color: AppColors.gray400),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              style: AppTextStyles.tiny.copyWith(
+                color: AppColors.gray400,
+                fontSize: isSmall ? 9 : 11,
+              ),
+            ),
           ),
         ],
       ),
